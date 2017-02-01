@@ -1,63 +1,47 @@
-
-export function func1(mesh, settings) {
-    var abs_y = settings.pos;
-    var height = settings.max - settings.min;
-    var rel_y = (settings.pos - settings.min) / height;
-    
-    mesh.position.set(0, abs_y, 0);
-    //mesh.scale.set(2, 1, 2);
+function bias(b, t) {
+    return Math.pow(t, Math.log(b) / Math.log(0.5));
 }
 
-export function sawtooth(mesh, settings) {
-    var height = settings.max - settings.min;
-    var abs_y = settings.pos;
-    var x = height - abs_y;
-    var rel_y = (settings.pos - settings.min) / height;
-    
-    mesh.position.set(0, abs_y, 0);
-    var freq = 9 / height;
-    var amp = Math.pow(x/10, 1.1);
-    var bias = Math.pow(x, Math.log(0.4588) / Math.log(0.5));
-    var s = (x * freq - Math.floor(x * freq)) * x*x/50;
-    mesh.scale.set(s,settings.size,s);
+function gain(g, t) {
+    if (t < 0.5) return bias(1-g, 2*t)/2;
+    else return 1 - bias(1-g, 2-2*t)/2;
 }
 
-export function triangle(mesh, settings) {
-    var abs_y = settings.pos;
-    var height = settings.max - settings.min;
-    var rel_y = (settings.pos - settings.min) / height;
-    var x = height - abs_y;
-    
-    mesh.position.set(0, abs_y, 0);
-    var freq = 10 / height; 
-    var amp = x;
-    var s = Math.abs(((x + freq) * freq) % 2 - (0.5 * 2));
-    s = s *s* x;
-    mesh.scale.set(s,settings.size,s);
+function parabola(x, k) {
+    return Math.pow(4*x*(1-x),k);
 }
 
-export function sine(mesh, settings) {
-    var abs_y = settings.pos;
-    var height = settings.max - settings.min;
-    var rel_y = (settings.pos - settings.min) / height;
-    var x = height - abs_y;
-    
-    mesh.position.set(0, abs_y, 0);
-    var s1 = Math.abs(x * Math.sin(x/3)/2);
-    var s2 = Math.abs(x * Math.sin(3*x)/10);
-    mesh.scale.set(s1 + s2,settings.size,s1 + s2);
+function cubicPulse(c, w, x) {
+    var x = Math.abs(x-c);
+    if (x>w) return 0;
+    x /=w;
+    return 1 - x*x*(3-2*x);
+}
+
+function pcurve(x, a, b) {
+    var k = Math.pow(a+b, a+b) / Math.pow(a,a) / Math.pow(b,b);
+    return k * Math.pow(x, a) * Math.pow(1-x, b);
 }
 
 export function spread(mesh, curve, params) {
-    var roo = curve.getPointAt(mesh.path/params.tessel);
-    mesh.position.set(roo.x, roo.y, roo.z - 0.05 * mesh.layer);
-    mesh.rotation.set(0,0,-3 * mesh.path * Math.PI/180);
-}
-
-export function shading(mesh, curve, params) {
-
+    var i = mesh.path/params.tessel/2;
+    var rot = -(150* bias(params.orientation, mesh.path/params.tessel) - 30);
+    var dist = parabola(i, 1.5); 
+    var roo = curve.getPointAt(dist);
+    var Xoutward = (-45 + 8*mesh.layer) * Math.PI/180;
+    var Yoverlap = -15 * Math.PI/180;
+    // var Zrightleft = -3 * mesh.path * Math.PI/180; // 20 -> -120
+    var Zrightleft = rot * Math.PI / 180;
+    mesh.position.set(roo.x, roo.y, roo.z-mesh.layer*0.001);
+    mesh.rotation.set(Xoutward, Yoverlap, Zrightleft);
 }
 
 export function size(mesh, curve, params) {
-    mesh.scale.set((mesh.layer+1)/3, (mesh.layer+1)/3, (mesh.layer+1)/3);
+    var oi = mesh.path/ params.tessel;
+    var l = gain(0.3,(mesh.layer + 1)/params.layers);
+    var x = 1+Math.sin(3 * Math.PI /2 * oi)* Math.sin(3 * Math.PI /2 * oi)/2;
+    var y = 1 + Math.cos(Math.PI * oi) * Math.cos(Math.PI * oi);
+    var sc = params.scale * cubicPulse(0, 2, 1-oi);
+    var sx = params.scale * Math.min(2*(1-bias(0.6, oi))+1,1.5);
+    mesh.scale.set(sx, x*y*sc*l, x*y*sc*l);
 }

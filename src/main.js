@@ -4,14 +4,14 @@
 const THREE = require('three'); // older modules are imported like this. You shouldn't have to worry about this much
 import Framework from './framework'
 
-import {func1, sawtooth, triangle, sine, spread, shading, size} from './distribution'
+import {spread, size} from './distribution'
 
 var val = function() {
-    this.speed = 100; this.curvature = 1; 
-    this.scale = 1; this.orientation = 0; this.color = [1,0,0];
-    this.flap = 0; this.motion = 0;
-    this.layers = 3; this.tessel = 30;
-    this.direction = 0; this.force = 0;
+    this.speed = 10; this.curvature = 1; 
+    this.scale = 1; this.orientation = 0.1; this.color = [1.0,0.0,0.0];
+    this.motion = 1;
+    this.layers = 3; this.tessel = 20;
+    this.direction = Math.PI; this.force = 0.5;
 };
 
 var feathers = [];
@@ -23,7 +23,8 @@ var new_mat = function(l) {
       uniforms: {
         color: {value: params.color},
         light: {value: [1.0, 3.0, 2.0]},
-        layer: {value: l}
+        layer: {value: l},
+        total: {value: params.layers}
         },
       vertexShader: require('./shaders/feather-vert.glsl'),
       fragmentShader: require('./shaders/feather-frag.glsl')
@@ -31,13 +32,18 @@ var new_mat = function(l) {
     return mat;
 }
 
-
 var p0 = new THREE.Vector3(2.5,0,0);
-var curve = new THREE.CatmullRomCurve3( [
-    p0, new THREE.Vector3(1.5,-0.5*params.curvature,0 ),
-    new THREE.Vector3(-1.5,0.5*params.curvature,0.75 + params.flap ),
-    new THREE.Vector3(-2.5,0.5,1 + params.flap)    
-    ]);
+var p1_0 = new THREE.Vector3(1.5,-0.5*params.curvature,-0.5*params.motion);
+var p1_1 = new THREE.Vector3(1.5,-0.5*params.curvature, 0.5*params.motion);
+var p2_0 = new THREE.Vector3(-1.5,0.5*params.curvature,0.75*params.motion);
+var p2_1 = new THREE.Vector3(-1,0.5*params.curvature,-0.75*params.motion);
+var p3_0 = new THREE.Vector3(-2.5,0.5*params.curvature,1*params.motion)
+var p3_1 = new THREE.Vector3(-1.25,0.5*params.curvature,-1*params.motion);
+var p1 = new THREE.Vector3(0,0,0); 
+var p2 = new THREE.Vector3(0,0,0); 
+var p3 = new THREE.Vector3(0,0,0);
+
+var curve = new THREE.CatmullRomCurve3( [p0, p1_0, p2_0, p3_0 ]);
 
 function createWing(scene, geo) {
     // remove all feathers
@@ -46,19 +52,21 @@ function createWing(scene, geo) {
     }
     feathers = [];
 
-    curve = new THREE.CatmullRomCurve3( [
-    p0, new THREE.Vector3(1.5,-0.5*params.curvature,0 ),
-    new THREE.Vector3(-1.5,0.5*params.curvature,0.75 + params.flap ),
-    new THREE.Vector3(-2.5,0.5 ,1 + params.flap)    
-    ]);
-
     var k;
     var material;
-    debugger
+
+    p1_0 = new THREE.Vector3(1.5,-5*params.curvature,-0.5*params.motion);
+    p1_1 = new THREE.Vector3(1.5,-5*params.curvature, 0.5*params.motion);
+    p2_0 = new THREE.Vector3(-1.5,0.5*params.curvature,0.75*params.motion);
+    p2_1 = new THREE.Vector3(-1.5,0.5*params.curvature,-0.75*params.motion);
+    p3_0 = new THREE.Vector3(-2.5,0.5*params.curvature,1*params.motion)
+    p3_1 = new THREE.Vector3(-2.5,0.5*params.curvature,-1*params.motion);
+    curve = new THREE.CatmullRomCurve3( [p0, p1_0, p2_0, p3_0 ]);
+    // debugger
     for (var j = 0; j < params.layers; j++) {
         material = new THREE.ShaderMaterial(new_mat(j));
         for (var i = 0; i < params.tessel; i++) {
-            k = i + params.tessel * j;
+            var k = feathers.length;
             var feather = new THREE.Mesh(geo, material);
             feathers.push(feather);
             feather.name = "feather" + (k).toString();
@@ -69,6 +77,10 @@ function createWing(scene, geo) {
             scene.add(feather);
         }
     }
+}
+
+function moveFeathers(scene) {
+
 }
 
 // called after the scene loads
@@ -106,7 +118,7 @@ function onLoad(framework) {
     });
 
     // set camera position
-    camera.position.set(0, 1, 5);
+    camera.position.set(0, 1, 10);
     camera.lookAt(new THREE.Vector3(0,0,0));
 
     scene.add(directionalLight);
@@ -119,49 +131,49 @@ function onLoad(framework) {
 
     //color
     f2.addColor(params, 'color').onChange(function(newVal) {
-    params.color = [newVal[0]/255, newVal[1]/255, newVal[2]/255];
+        // params.color = [newVal[0]/255, newVal[1]/255, newVal[2]/255];
+        createWing(scene, featherGeo);
     });
     //scale
-    f2.add(params, 'scale',0.0, 2.0).onChange(function(newVal) {
-        params['scale'] = newVal;});
+    f2.add(params, 'scale',0.0, 2.0).onChange(function(newVal) {});
     //orient
-    f2.add(params, 'orientation',0.0, 2.0).onChange(function(newVal) {
-        params.orientation = newVal;});
+    f2.add(params, 'orientation',0.0, 1.0).onChange(function(newVal) {});
     // flapping speed
-    f1.add(params, 'speed', 1, 100).onChange(function(newVal) {
-        params['speed'] = newVal;});
+    f1.add(params, 'speed', 0, 40).onChange(function(newVal) {});
     // flapping motion
-    f1.add(params, 'motion', 1, 100).onChange(function(newVal) {
-        params['motion'] = newVal;});
+    f1.add(params, 'motion', 0, 3).onChange(function(newVal) {
+        createWing(scene, featherGeo);});
     //curvature
-    f1.add(params, 'curvature', 0.0, 2.0).onChange(function(newVal) {
-        params.curvature = newVal;
+    f1.add(params, 'curvature', 0.0, 5).onChange(function(newVal) {
         createWing(scene, featherGeo);});
     // distribution
     f1.add(params, 'layers', 0, 5).step(1).onChange(function(newVal) {
-        params.layers = newVal;
         createWing(scene, featherGeo);});
-    f1.add(params, 'tessel', 0, 100).onChange(function(newVal) {
-        params.tessel = newVal;
+    f1.add(params, 'tessel', 0, 100).step(1).onChange(function(newVal) {
         createWing(scene, featherGeo);});
     // force magnitude
-    f3.add(params, 'force', 20, 100).onChange(function(newVal) {
-        params['force'] = newVal;});
+    f3.add(params, 'force', 0,1).onChange(function(newVal) {});
     // force direction
-    f3.add(params, 'direction').onChange(function(newVal) {
-        params.direction = newVal;});
+    f3.add(params, 'direction', 0, 2*Math.PI).onChange(function(newVal) {});
 }
 
 // called on frame updates
 function onUpdate(framework) {
     var date = new Date();
-
+    var t = Math.sin(params.speed * date.getTime()/(4*1000))/2 + 0.5;
+    curve = new THREE.CatmullRomCurve3( 
+        [p0, p1.lerpVectors(p1_0, p1_1, t), 
+        p1.lerpVectors(p2_0, p2_1, t), 
+        p2.lerpVectors(p3_0, p3_1,t)]);
     for (var i = 0; i < feathers.length; i++) {
         var feather = framework.scene.getObjectByName("feather" + i.toString());    
         if (feather !== undefined) {
             size(feather, curve, params);
-            spread(feather, curve, params); 
-            feather.rotateZ(Math.sin(date.getTime() / 100) * 2 * Math.PI / 180);      
+            spread(feather, curve, params);
+            var flutter = params.force * Math.cos(params.direction)/2;
+            feather.rotateY(flutter*Math.sin(date.getTime()/(25 + Math.random())));
+            //feather.rotateZ(Math.sin(date.getTime())/(100 + Math.random()));
+            //feather.rotateZ(Math.sin(date.getTime() / 100) * 2 * Math.PI / 180);      
         }
     }
 }
